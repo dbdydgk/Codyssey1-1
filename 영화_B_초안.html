@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<!--Claude Sonnet 4.6-->
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎬 나만의 영화 티어리스트</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --tier-label-width: 100px;
+            --card-w: 100px;
+            --card-h: 150px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg-color);
+            color: white;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 30px 20px;
+            min-height: 100vh;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 30px;
+            letter-spacing: 2px;
+        }
+
+        /* ── 티어 테이블 ── */
+        .tier-container {
+            width: 100%;
+            max-width: 1000px;
+            border: 2px solid #444;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 40px;
+        }
+
+        .tier-row {
+            display: flex;
+            border-bottom: 1px solid #444;
+            min-height: var(--card-h);
+        }
+
+        .tier-row:last-child { border-bottom: none; }
+
+        .tier-label {
+            width: var(--tier-label-width);
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.2rem;
+            font-weight: bold;
+            color: #000;
+        }
+
+        .s-tier { background-color: #ff7f7f; }
+        .a-tier { background-color: #ffbf7f; }
+        .b-tier { background-color: #ffff7f; }
+        .c-tier { background-color: #7fff7f; }
+        .d-tier { background-color: #7fbfff; }
+
+        .tier-content {
+            flex-grow: 1;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding: 12px;
+            background-color: #1a1a1a;
+            align-content: flex-start;
+            /* 드롭 가능 영역 강조 */
+            transition: background 0.2s;
+        }
+
+        .tier-content.drag-over {
+            background-color: #2a2a2a;
+            outline: 2px dashed #888;
+        }
+
+        /* ── 영화 카드 ── */
+        .movie-card {
+            width: var(--card-w);
+            height: var(--card-h);
+            background-color: #333;
+            border-radius: 6px;
+            overflow: hidden;
+            cursor: grab;
+            position: relative;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.6);
+            transition: transform 0.15s;
+            flex-shrink: 0;
+        }
+
+        .movie-card:hover { transform: scale(1.05); }
+        .movie-card:active { cursor: grabbing; }
+
+        .movie-card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            pointer-events: none;
+            display: block;
+        }
+
+        .movie-card .title-tag {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            background: rgba(0,0,0,0.75);
+            font-size: 10px;
+            text-align: center;
+            padding: 4px 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* ── 검색 영역 (하단 고정) ── */
+        .search-section {
+            width: 100%;
+            max-width: 1000px;
+            background: #1e1e1e;
+            border: 1px solid #444;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .search-section h3 {
+            margin-bottom: 14px;
+            font-size: 1.1rem;
+            color: #ccc;
+        }
+
+        .search-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .search-bar input {
+            flex-grow: 1;
+            padding: 12px 15px;
+            border-radius: 6px;
+            border: 1px solid #555;
+            background: #121212;
+            color: white;
+            font-size: 15px;
+            outline: none;
+        }
+
+        .search-bar input:focus { border-color: #e50914; }
+
+        .search-bar button {
+            padding: 0 28px;
+            background: #e50914;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        .search-bar button:hover { background: #c40812; }
+
+        #search-results {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            min-height: 180px;
+            padding: 16px;
+            border: 2px dashed #444;
+            border-radius: 8px;
+            background: #121212;
+            align-content: flex-start;
+        }
+
+        .placeholder-text {
+            color: #666;
+            width: 100%;
+            text-align: center;
+            margin-top: 60px;
+            font-size: 14px;
+        }
+
+        /* 로딩 스피너 */
+        .spinner {
+            width: 100%;
+            text-align: center;
+            margin-top: 60px;
+            color: #888;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🎬 나만의 영화 티어리스트</h1>
+
+    <!-- 티어 테이블 -->
+    <div class="tier-container">
+        <div class="tier-row" data-tier="S">
+            <div class="tier-label s-tier">S</div>
+            <div class="tier-content" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)"></div>
+        </div>
+        <div class="tier-row" data-tier="A">
+            <div class="tier-label a-tier">A</div>
+            <div class="tier-content" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)"></div>
+        </div>
+        <div class="tier-row" data-tier="B">
+            <div class="tier-label b-tier">B</div>
+            <div class="tier-content" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)"></div>
+        </div>
+        <div class="tier-row" data-tier="C">
+            <div class="tier-label c-tier">C</div>
+            <div class="tier-content" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)"></div>
+        </div>
+        <div class="tier-row" data-tier="D">
+            <div class="tier-label d-tier">D</div>
+            <div class="tier-content" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)"></div>
+        </div>
+    </div>
+
+    <!-- 검색 영역 -->
+    <div class="search-section">
+        <h3>🔍 영화 검색 — 포스터를 위 티어로 드래그하세요!</h3>
+        <div class="search-bar">
+            <input
+                type="text"
+                id="search-input"
+                placeholder="영화 제목을 입력하세요 (예: 어벤져스)"
+                onkeypress="if(event.keyCode===13) searchMovies()"
+            >
+            <button onclick="searchMovies()">검색</button>
+        </div>
+        <div id="search-results" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)">
+            <p class="placeholder-text">검색 결과가 여기에 표시됩니다.<br>포스터를 위의 티어 칸으로 드래그하여 추가하세요!</p>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = '2351c2a8ae20e05f2d255d5bd7ad0a11';
+        const IMG_BASE = 'https://image.tmdb.org/t/p/w200';
+
+        /* ── 드래그 앤 드롭 ── */
+        function allowDrop(ev) {
+            ev.preventDefault();
+            // 드롭 가능 영역 시각적 강조
+            let target = ev.currentTarget;
+            target.classList.add('drag-over');
+        }
+
+        function dragLeave(ev) {
+            ev.currentTarget.classList.remove('drag-over');
+        }
+
+        function drop(ev) {
+            ev.preventDefault();
+            ev.currentTarget.classList.remove('drag-over');
+
+            const id = ev.dataTransfer.getData('text');
+            const card = document.getElementById(id);
+            if (!card) return;
+
+            // 드롭 대상 찾기 (tier-content 또는 search-results)
+            let target = ev.target;
+            while (target && !target.classList.contains('tier-content') && target.id !== 'search-results') {
+                target = target.parentElement;
+            }
+
+            if (target) {
+                target.appendChild(card);
+                saveData();
+            }
+        }
+
+        /* ── 영화 검색 ── */
+        async function searchMovies() {
+            const query = document.getElementById('search-input').value.trim();
+            if (!query) return;
+
+            const resultsEl = document.getElementById('search-results');
+            resultsEl.innerHTML = '<p class="spinner">검색 중...</p>';
+
+            try {
+                const url = `https://api.themoviedb.org/3/search/movie?api_key=${API_KEY}&query=${encodeURIComponent(query)}&language=ko-KR`;
+                const res = await fetch(url);
+                const data = await res.json();
+                showResults(data.results || []);
+            } catch (e) {
+                resultsEl.innerHTML = '<p class="placeholder-text">⚠️ 검색 중 오류가 발생했습니다. 인터넷 연결을 확인하세요.</p>';
+            }
+        }
+
+        function showResults(movies) {
+            const resultsEl = document.getElementById('search-results');
+            resultsEl.innerHTML = '';
+
+            const filtered = movies.filter(m => m.poster_path);
+
+            if (filtered.length === 0) {
+                resultsEl.innerHTML = '<p class="placeholder-text">검색 결과가 없습니다.</p>';
+                return;
+            }
+
+            filtered.forEach(movie => {
+                const card = makeCard(
+                    'search-' + movie.id,
+                    movie.title,
+                    IMG_BASE + movie.poster_path
+                );
+                resultsEl.appendChild(card);
+            });
+        }
+
+        /* ── 카드 생성 ── */
+        function makeCard(id, title, imgUrl) {
+            const card = document.createElement('div');
+            card.className = 'movie-card';
+            card.id = id;
+            card.draggable = true;
+            card.ondragstart = ev => ev.dataTransfer.setData('text', ev.currentTarget.id);
+
+            // 우클릭 삭제
+            card.oncontextmenu = ev => {
+                ev.preventDefault();
+                if (confirm(`"${title}" 을(를) 삭제할까요?`)) {
+                    card.remove();
+                    saveData();
+                }
+            };
+
+            card.innerHTML = `
+                <img src="${imgUrl}" alt="${title}">
+                <div class="title-tag">${title}</div>
+            `;
+            return card;
+        }
+
+        /* ── LocalStorage 저장/불러오기 ── */
+        function saveData() {
+            const tiers = {};
+            document.querySelectorAll('.tier-row').forEach(row => {
+                const key = row.dataset.tier;
+                tiers[key] = Array.from(row.querySelectorAll('.movie-card')).map(c => ({
+                    id: c.id,
+                    title: c.querySelector('.title-tag').innerText,
+                    img: c.querySelector('img').src
+                }));
+            });
+            localStorage.setItem('tierlist_v3', JSON.stringify(tiers));
+        }
+
+        function loadData() {
+            const raw = localStorage.getItem('tierlist_v3');
+            if (!raw) return;
+            const tiers = JSON.parse(raw);
+            Object.entries(tiers).forEach(([tier, movies]) => {
+                const container = document.querySelector(`.tier-row[data-tier="${tier}"] .tier-content`);
+                if (!container) return;
+                movies.forEach(m => container.appendChild(makeCard(m.id, m.title, m.img)));
+            });
+        }
+
+        window.onload = loadData;
+    </script>
+</body>
+</html>
